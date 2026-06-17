@@ -1,0 +1,86 @@
+---
+title: "Question 1 — Coffee Hub: what to stock"
+author: "Student 25052977"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: powerpoint_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+# Functional programming: this report only *calls* functions defined in code/.
+source("code/Load_Coffee.R")
+source("code/coffee_keywords.R")
+source("code/coffee_value.R")
+source("code/coffee_regions.R")
+
+coffee   <- Load_Coffee()              # reads + cleans ../data/Coffee/Coffee.csv
+coffee   <- Score_Keywords(coffee)     # adds kw_hits / kw_density
+pq       <- Price_Quality_Cor(coffee)  # does price buy quality?
+regions  <- Region_Summary(coffee)
+roasters <- Roaster_Summary(coffee)
+rs       <- Roast_Summary(coffee)
+```
+
+## The brief
+
+Advise a coffee entrepreneur which **characteristics, regions and suppliers** to stock,
+using `r nrow(coffee)` expert reviews matched against what locals actually like.
+
+## Data at a glance
+
+- `r nrow(coffee)` reviews, `r ncol(coffee)` variables.
+- Survey keywords scored per review (`kw_hits`): mean
+  `r round(mean(coffee$kw_hits), 2)`, max `r max(coffee$kw_hits)`.
+
+## Does paying more buy a better cup?
+
+- Spearman correlation between cost and rating: **rho = `r pq$rho`** (p = `r pq$p_value`).
+- `r if (pq$rho < 0.15) "Essentially no link; price is a weak guide to quality." else "Some positive link, but far from deterministic."`
+- Implication: stock on **value**, not on price tag.
+
+## Best value coffees (rating per unit cost)
+
+```{r}
+knitr::kable(Top_Value(coffee, 10))
+```
+
+## Best origin regions
+
+```{r}
+knitr::kable(head(regions, 8))
+```
+
+## Best roasters / suppliers
+
+```{r}
+knitr::kable(head(roasters, 8))
+```
+
+## Which roast to stock?
+
+```{r}
+knitr::kable(rs)
+```
+
+- Most reviewed coffees are **Medium-Light** roasts, the local specialty default.
+- Best-rated roast: **`r as.character(rs$Roast[which.max(rs$avg_rating)])`**
+  (avg rating `r max(rs$avg_rating)`).
+- Lighter roasts score best at the specialty end; stock mainly Medium-Light with a
+  Light option for the top scorers, and keep dark roasts minimal.
+
+## What locals like — recommended shortlist
+
+```{r}
+knitr::kable(Good_Local_Picks(coffee, 8))
+```
+
+## Recommendation
+
+- **Stock for value over price:** cost only loosely predicts rating (rho = `r pq$rho`).
+- **Lead with `r regions$Region[1]` and `r regions$Region[2]`:** highest average
+  ratings among well-reviewed origins.
+- **Favour Medium-Light / Light roasts**, which carry the local specialty market.
+- **Anchor suppliers on `r roasters$Roaster[1]`** (avg rating `r roasters$avg_rating[1]`,
+  `r roasters$n[1]` reviews).
+- **Curate the "good local" shortlist** above: coffees that hit the survey descriptors
+  locals use *and* deliver value.
