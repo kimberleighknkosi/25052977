@@ -1,0 +1,96 @@
+---
+title: "Question 2 — US Baby Names (1910–2014)"
+author: "Student 25052977"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      fig.width = 9, fig.height = 5)
+source("code/baby_names.R")
+baby   <- readr::read_rds("../data/US_Baby_names/Baby_Names_By_US_State.rds")
+hbo    <- readr::read_rds("../data/US_Baby_names/HBO_credits.rds")
+charts <- readr::read_rds("../data/US_Baby_names/charts.rds")
+nat    <- National_Counts(baby)   # national counts per name / year / gender
+```
+
+## The brief
+
+For a toy-design agency: which names have been most popular over time, how *persistent*
+that popularity is, and the surges that follow culture (TV characters, singers, songs).
+The agency wants this to guide which character names to put on toys.
+
+## Most popular names by decade
+
+```{r}
+char_names <- HBO_Character_Firstnames(hbo)
+top15 <- Top_Names_Overall(nat, 15)
+Bubble_Data(nat, top15) %>%
+  mutate(is_char = Name %in% char_names) %>%
+  ggplot(aes(Name, factor(Decade), size = n, colour = is_char)) +
+  geom_point(alpha = 0.7) +
+  scale_size_area(max_size = 12, labels = scales::comma) +
+  scale_colour_manual(values = c(`FALSE` = "grey55", `TRUE` = "firebrick"),
+                      labels = c("other", "also a series character")) +
+  labs(x = NULL, y = NULL, size = "births", colour = NULL,
+       title = "Most-used names by decade (red = also an HBO series character name)") +
+  theme_bw(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The all-time favourites are long-runners that rise and fade over the decades. Several of
+them also turn up as series character names (red), but that is mostly because common
+names get reused for characters, so the popularity came first and the shows followed.
+
+## How persistent is popularity?
+
+For each year I take the 25 most popular names per gender and check how similar their
+ranking still is three years later (Spearman rho).
+
+```{r}
+ps <- Persistence_Series(nat, top = 25, lag = 3)
+ps %>%
+  ggplot(aes(Year, rho, colour = Gender)) +
+  geom_line() +
+  geom_smooth(se = FALSE, linewidth = 0.6) +
+  geom_vline(xintercept = 1990, linetype = "dashed", colour = "grey50") +
+  ylim(0, 1) +
+  labs(y = "rank correlation, 3 years on",
+       title = "Top-name rankings used to be very sticky; less so recently") +
+  theme_bw(base_size = 11)
+```
+
+```{r}
+pre  <- mean(ps$rho[ps$Year <  1990], na.rm = TRUE)
+post <- mean(ps$rho[ps$Year >= 1990], na.rm = TRUE)
+```
+
+Persistence is high throughout (rho mostly above 0.8): a year's top names are usually
+still near the top three years later. But it has softened: average rho is
+`r round(pre, 2)` before 1990 versus `r round(post, 2)` from 1990 on. So the agency's
+hunch is right: names churn a little faster now than they used to.
+
+## Surges that follow culture
+
+These names at least tripled in a single year. Where a Billboard artist with the same
+first name was charting in the two years before the spike, I flag it as a likely cause.
+
+```{r}
+sg <- Annotate_Surges(Name_Surges(nat), charts)
+knitr::kable(sg)
+```
+
+The matches are telling: the **Mariah** spike (1991) lands right after Mariah Carey's
+chart debut, **Selena** surges in the mid-90s, and similar music-driven jumps show up
+elsewhere. This is the pattern the agency cares about. A name can ride a hit, but (from
+the persistence result) it will likely fade just as fast, so a toy tie-in should be timed
+to the surge rather than treated as a lasting trend.
+
+## Notes
+
+Counts are national (summed over states). The bubble uses the 15 highest-count names
+overall; persistence uses the top 25 per year per gender; the surge cross-reference uses
+the Billboard `charts.rds` data. HBO character names are used to flag character overlaps.
+The brief's 1974 *Katina* example is the same kind of TV-driven spike, from a soap-opera
+character that year.
