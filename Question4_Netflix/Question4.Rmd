@@ -1,0 +1,107 @@
+---
+title: "Question 4 — Netflix: what works in streaming"
+author: "Student 25052977"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      fig.width = 8, fig.height = 4)
+source("code/Load_Netflix.R")
+source("code/netflix_analysis.R")
+nf <- Load_Netflix()   # ../data/netflix/titles.rds, list-columns parsed
+```
+
+## The brief
+
+A team thinking about launching a streaming service wants a quick read on what sits on
+Netflix and what rates well: the mix of content by country and type, the genres that
+dominate, how titles score, how long movies run, and what the catalogue is "about".
+
+## What's on the platform
+
+```{r}
+knitr::kable(Type_Split(nf), caption = "Movies vs shows")
+```
+
+```{r}
+knitr::kable(Country_Summary(nf, 10), caption = "Top production countries by number of titles")
+```
+
+The catalogue is mostly films, and heavily US-led, with India, the UK, Japan and South
+Korea making up most of the rest. For a new entrant that says the obvious markets are
+crowded, and that Korean and Japanese content is a meaningful slice worth watching.
+
+## Which genres dominate, and do they rate well?
+
+```{r}
+gs <- Genre_Summary(nf, 12)
+gs %>%
+  ggplot(aes(reorder(genre, titles), titles)) +
+  geom_col(fill = "firebrick") +
+  coord_flip() +
+  labs(x = NULL, y = "number of titles",
+       title = "Most common genres on Netflix") +
+  theme_bw(base_size = 11)
+knitr::kable(gs, caption = "Genre counts and average IMDb score")
+```
+
+Drama and comedy are by far the most stocked, but volume and quality don't line up:
+the most common genres sit around the middle on IMDb, while smaller genres like
+documentation and history tend to rate higher. Stocking more of a genre does not make
+it better content.
+
+## How do titles rate?
+
+```{r}
+knitr::kable(Ratings_By_Type(nf), caption = "IMDb rating by type")
+nf %>%
+  filter(!is.na(imdb_score)) %>%
+  ggplot(aes(imdb_score, fill = type)) +
+  geom_density(alpha = 0.4) +
+  labs(x = "IMDb score", y = NULL, title = "Shows rate a little higher than movies") +
+  theme_bw(base_size = 11)
+```
+
+Shows tend to score slightly higher than movies, and the spread is wide for both:
+plenty of low-rated filler alongside the hits. A new service competing on quality could
+do well to be more selective than the "stock everything" approach.
+
+## How long are the movies?
+
+```{r}
+Movies_Runtime(nf) %>%
+  ggplot(aes(runtime)) +
+  geom_histogram(binwidth = 5, fill = "steelblue") +
+  labs(x = "runtime (minutes)", y = "movies",
+       title = "Most movies cluster around 90–100 minutes") +
+  theme_bw(base_size = 11)
+```
+
+Movie length is tightly clustered around the standard 90–100 minute feature, tailing off
+past two hours. There's little appetite on the platform for very short or very long films.
+
+## What is the catalogue about?
+
+```{r}
+Description_Words(nf, 20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col(fill = "grey35") +
+  coord_flip() +
+  labs(x = NULL, y = "mentions in descriptions",
+       title = "Most common words in title descriptions") +
+  theme_bw(base_size = 11)
+```
+
+The descriptions lean on life, family, love, young and friends: the themes the platform
+keeps coming back to. Useful for a new service deciding what emotional territory to own.
+
+## Takeaways for the team
+
+- The market is film-heavy and US-dominated, but Korean and Japanese content is a real,
+  growing slice worth targeting.
+- Stocking a genre heavily doesn't make it rate well: documentaries and history punch
+  above their volume on IMDb.
+- Shows edge out movies on ratings; quality varies widely, so curation beats quantity.
+- Movies cluster at 90–100 minutes; descriptions centre on family, love and youth.
