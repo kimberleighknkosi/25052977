@@ -1,0 +1,124 @@
+---
+title: "Question 3 — Lending Club: who defaults"
+author: "Student 25052977"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      fig.width = 8, fig.height = 4)
+source("code/Load_Loans.R")
+source("code/loan_analysis.R")
+loans  <- Load_Loans(sample_n = 50000)   # reproducible sample of the 1M rows
+s_rate <- mean(Settled_Loans(loans)$default)
+```
+
+## The brief
+
+The Director wants to challenge three long-held beliefs and answer some practical
+questions about default risk. I work on **settled** loans only (outcome known: Fully
+Paid vs Charged Off / Default); `r scales::percent(s_rate, 0.1)` of them defaulted.
+
+## Belief 1 — owners and long-tenure staff default less (esp. short-term)
+
+```{r}
+knitr::kable(Belief_Home_Tenure(loans))
+```
+
+Home owners and 10+ year employees do default a little less, but the effect is small
+next to loan term: 60-month loans default far more than 36-month ones in every group.
+So the belief points the right way, but term matters more than tenure or ownership.
+
+## Belief 2 — states differ in default culture
+
+```{r}
+st <- Belief_State(loans)
+knitr::kable(rbind(head(st, 5), tail(st, 5)))
+```
+
+```{r}
+st %>%
+  ggplot(aes(reorder(State, default_rate), default_rate)) +
+  geom_col(fill = "grey35") + coord_flip() +
+  labs(x = NULL, y = "default rate", title = "Default rate by state (settled loans)") +
+  theme_bw(base_size = 11)
+```
+
+Rates run from `r scales::percent(min(st$default_rate))` to
+`r scales::percent(max(st$default_rate))`, a real spread of about
+`r round((max(st$default_rate)-min(st$default_rate))*100)` points. But much of it likely
+reflects borrower mix (grade, purpose) rather than any geographic "culture". The
+difference is genuine but confounded.
+
+## Belief 3 — grade and interest rate predict default
+
+```{r}
+knitr::kable(Belief_Grade(loans))
+Belief_Grade(loans) %>%
+  ggplot(aes(Grade, default_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "credit grade", y = "default rate",
+       title = "Default rate climbs steadily from grade A to G") +
+  theme_bw(base_size = 11)
+```
+
+This is the strongest belief, and it holds: default rate rises monotonically from A to G,
+and interest rate tracks it. Grade and rate clearly carry signal.
+
+## Quantifying the drivers
+
+```{r}
+knitr::kable(Risk_Model(loans))
+```
+
+As odds ratios (>1 raises default odds), interest rate is the single clearest driver:
+each extra percentage point raises default odds by about 12%, and the 60-month term
+adds risk, while home ownership and long tenure pull it down.
+
+## Answering the Director
+
+**A sensible DTI cap.** Default rate by debt-to-income band:
+
+```{r}
+knitr::kable(DTI_Default(loans))
+DTI_Default(loans) %>%
+  ggplot(aes(dti_band, default_rate)) +
+  geom_col(fill = "darkorange") +
+  labs(x = "debt-to-income band", y = "default rate",
+       title = "Default risk rises with DTI, steeply past 30") +
+  theme_bw(base_size = 11)
+```
+
+Risk rises steadily with DTI and is clearly worse above 30. A **hard cap around
+DTI 30–35** is a defensible line: below it, default tolerance is reasonable; above it,
+risk accelerates. Different tolerance levels follow directly, e.g. cap at 25 to be
+conservative, 35 to be permissive.
+
+**Does it differ by state? Is Texas different?**
+
+```{r}
+knitr::kable(Texas_Vs_Rest(loans))
+knitr::kable(DTI_Default_Texas(loans), caption = "Default rate by DTI band: Texas vs rest")
+```
+
+Texas sits close to the national picture: its overall default rate and DTI curve track
+the rest of the US, so **one DTI cap fits Texas too**; it doesn't need its own line.
+
+**Are the Institute's heuristics realistic?**
+
+- *Owners / long-tenure default less:* true but weak, with a real signal and a small effect.
+- *States have a default culture:* overstated; the differences are mostly borrower-mix.
+- *Grade and rate predict default:* strongly supported, and the most reliable of the three.
+
+**Who is most likely to default, and what reduces risk?** The highest-risk profile is a
+low-grade, high-interest, 60-month loan to a renter; the lowest is a top-grade short-term
+loan to a long-tenure home owner. To reduce risk at assessment, lean on **grade/interest
+rate and DTI** (the variables that actually carry signal) rather than state or job tenure.
+
+## Limitation
+
+The data has no borrower **age**, so the brief's "younger borrowers" and "rates set by
+age/occupation" angles can't be tested directly, and interest rate stands in as the risk
+signal. Figures use a 50,000-loan reproducible sample; directions are stable, exact
+rates shift slightly on the full data.
